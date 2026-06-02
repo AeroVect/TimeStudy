@@ -249,6 +249,62 @@
     text-transform: uppercase;
   }
 
+  /* row holding the "Locations" label and the stepper */
+  .section-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .section-row .section-label { margin-bottom: 0; }
+
+  /* ---- stepper ---- */
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .step-btn {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    width: 36px;
+    height: 34px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .step-btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--accent);
+  }
+  .step-btn:active:not(:disabled) { transform: scale(0.92); }
+  .step-btn:disabled {
+    color: var(--border-2);
+    cursor: not-allowed;
+  }
+  .step-value {
+    min-width: 28px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 0 8px;
+    line-height: 34px;
+    user-select: none;
+  }
+
   .log-section {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -397,6 +453,15 @@
     </div>
   </header>
 
+  <div class="section-row">
+    <span class="section-label">Locations</span>
+    <div class="stepper" role="group" aria-label="Number of locations">
+      <button type="button" class="step-btn" id="removeLocBtn" aria-label="Remove last location">−</button>
+      <span class="step-value" id="locCount">3</span>
+      <button type="button" class="step-btn" id="addLocBtn" aria-label="Add location">+</button>
+    </div>
+  </div>
+
   <div class="scenarios" id="scenarios"></div>
 
   <div class="section-label">Log</div>
@@ -429,14 +494,20 @@
   const TASKS = ['Drv Task', 'Non Drv Task', 'Idle'];
   const STATE_KEY = 'multi-tracker:state';
 
-  // Initial scenarios — names are editable; user can rename in the UI.
+  const MIN_LOCATIONS = 1;
+  const MAX_LOCATIONS = 6;
+  const DEFAULT_LOCATIONS = 3;
+
+  // Scenarios are kept in storage even when "hidden" via visibleCount,
+  // so their names persist if the user shrinks and re-expands later.
   function makeInitialState() {
+    const scenarios = [];
+    for (let i = 1; i <= MAX_LOCATIONS; i++) {
+      scenarios.push({ id: 's' + i, name: 'Location ' + i, active: null });
+    }
     return {
-      scenarios: [
-        { id: 's1', name: 'Location 1', active: null },
-        { id: 's2', name: 'Location 2', active: null },
-        { id: 's3', name: 'Location 3', active: null }
-      ],
+      scenarios: scenarios,
+      visibleCount: DEFAULT_LOCATIONS,
       log: []
     };
   }
@@ -494,13 +565,31 @@
       const raw = await storage.get(STATE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.scenarios) && parsed.scenarios.length === 3) {
-          state.scenarios = parsed.scenarios.map(s => ({
+        if (Array.isArray(parsed.scenarios) && parsed.scenarios.length > 0) {
+          // Carry over saved scenarios; pad up to MAX_LOCATIONS with defaults
+          // so the slot array is always the right shape.
+          const carried = parsed.scenarios.map(s => ({
             id: s.id,
             name: typeof s.name === 'string' ? s.name : 'Location',
             active: s.active || null
           }));
+          const next = [];
+          for (let i = 0; i < MAX_LOCATIONS; i++) {
+            if (carried[i]) {
+              // Make sure the id matches the slot index, otherwise re-id it.
+              next.push({ ...carried[i], id: 's' + (i + 1) });
+            } else {
+              next.push({ id: 's' + (i + 1), name: 'Location ' + (i + 1), active: null });
+            }
+          }
+          state.scenarios = next;
         }
+        // Migration: older saves had no visibleCount; default to whatever
+        // they had configured (typically 3).
+        const savedCount = Number.isInteger(parsed.visibleCount)
+          ? parsed.visibleCount
+          : (Array.isArray(parsed.scenarios) ? parsed.scenarios.length : DEFAULT_LOCATIONS);
+        state.visibleCount = Math.max(MIN_LOCATIONS, Math.min(MAX_LOCATIONS, savedCount));
         if (Array.isArray(parsed.log)) state.log = parsed.log;
       }
     } catch (e) {
@@ -615,19 +704,99 @@
     render();
   }
 
+  // ---- add / remove location ----
+  async function addLocation() {
+    if (state.visibleCount >= MAX_LOCATIONS) {
+      showToast(`Max ${MAX_LOCATIONS} locations`);
+      return;
+    }
+    state.visibleCount += 1;
+    await saveState();
+    render();
+  }
+
+  function removeLocation() {
+    if (state.visibleCount <= MIN_LOCATIONS) {
+      showToast(`Min ${MIN_LOCATIONS} location`);
+      return;
+    }
+    // The slot being removed is the last visible one.
+    const slot = state.scenarios[state.visibleCount - 1];
+    if (slot && slot.active) {
+      // Confirm before discarding a running timer.
+      openConfirmModal({
+        title: 'Stop and Remove',
+        body: `"${slot.name}" has a running timer (${slot.active.taskName}). Removing will stop it and log the elapsed time. Continue?`,
+        confirmLabel: 'Stop & Remove',
+        danger: true,
+        onConfirm: () => doRemoveLocation()
+      });
+      return;
+    }
+    doRemoveLocation();
+  }
+
+  async function doRemoveLocation() {
+    const slotIndex = state.visibleCount - 1;
+    const slot = state.scenarios[slotIndex];
+    // If a timer is running on the slot being hidden, finalize it into the log
+    // so the elapsed time isn't lost.
+    if (slot && slot.active) {
+      const now = Date.now();
+      const finished = {
+        id: slot.active.id,
+        scenarioId: slot.id,
+        scenarioName: slot.name,
+        taskName: slot.active.taskName,
+        startTime: slot.active.startTime,
+        endTime: now,
+        durationMs: Math.max(0, now - slot.active.startTime)
+      };
+      if (finished.durationMs >= 500) state.log.unshift(finished);
+      slot.active = null;
+    }
+    state.visibleCount -= 1;
+    await saveState();
+    render();
+  }
+
+  // ---------- generic confirm modal ----------
+  // The modal is reused for "clear all" and "remove location" confirmations.
+  let pendingConfirm = null;
+  function openConfirmModal({ title, body, confirmLabel = 'Confirm', danger = true, onConfirm }) {
+    document.getElementById('modalTitle').textContent = title || 'Confirm';
+    document.getElementById('modalBody').textContent = body || '';
+    const confirmBtn = document.getElementById('modalConfirm');
+    confirmBtn.textContent = confirmLabel;
+    confirmBtn.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
+    pendingConfirm = typeof onConfirm === 'function' ? onConfirm : null;
+    document.getElementById('modalBackdrop').classList.add('show');
+  }
+  function closeConfirmModal() {
+    document.getElementById('modalBackdrop').classList.remove('show');
+    pendingConfirm = null;
+  }
+  async function runPendingConfirm() {
+    const cb = pendingConfirm;
+    closeConfirmModal();
+    if (cb) await cb();
+  }
+
   function openClearModal() {
     const hasAnyActive = state.scenarios.some(s => s.active);
     if (todayLog().length === 0 && !hasAnyActive) {
       showToast('Nothing to clear');
       return;
     }
-    document.getElementById('modalBackdrop').classList.add('show');
-  }
-  function closeClearModal() {
-    document.getElementById('modalBackdrop').classList.remove('show');
+    openConfirmModal({
+      title: 'Confirm',
+      body: 'Clear all entries for today and stop all running timers? This cannot be undone.',
+      confirmLabel: 'Clear All',
+      danger: true,
+      onConfirm: confirmClear
+    });
   }
   async function confirmClear() {
-    closeClearModal();
     const start = startOfToday(), end = endOfToday();
     state.log = state.log.filter(e => e.startTime < start || e.startTime > end);
     state.scenarios.forEach(s => { s.active = null; });
@@ -679,10 +848,21 @@
   }
 
   function render() {
-    // scenarios
+    // ---- stepper state ----
+    const count = state.visibleCount;
+    document.getElementById('locCount').textContent = count;
+    const addBtn = document.getElementById('addLocBtn');
+    const removeBtn = document.getElementById('removeLocBtn');
+    addBtn.disabled = count >= MAX_LOCATIONS;
+    removeBtn.disabled = count <= MIN_LOCATIONS;
+    addBtn.setAttribute('aria-disabled', addBtn.disabled);
+    removeBtn.setAttribute('aria-disabled', removeBtn.disabled);
+
+    // scenarios — only render the visible slice
     const container = document.getElementById('scenarios');
     container.innerHTML = '';
-    state.scenarios.forEach(scenario => {
+    const visible = state.scenarios.slice(0, count);
+    visible.forEach(scenario => {
       const isActive = !!scenario.active;
       const elapsedText = isActive
         ? formatElapsed(Date.now() - scenario.active.startTime)
@@ -809,13 +989,15 @@
   // ---------- init ----------
   document.getElementById('clearBtn').addEventListener('click', openClearModal);
   document.getElementById('exportBtn').addEventListener('click', exportCSV);
-  document.getElementById('modalCancel').addEventListener('click', closeClearModal);
-  document.getElementById('modalConfirm').addEventListener('click', confirmClear);
+  document.getElementById('addLocBtn').addEventListener('click', addLocation);
+  document.getElementById('removeLocBtn').addEventListener('click', removeLocation);
+  document.getElementById('modalCancel').addEventListener('click', closeConfirmModal);
+  document.getElementById('modalConfirm').addEventListener('click', runPendingConfirm);
   document.getElementById('modalBackdrop').addEventListener('click', (e) => {
-    if (e.target.id === 'modalBackdrop') closeClearModal();
+    if (e.target.id === 'modalBackdrop') closeConfirmModal();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeClearModal();
+    if (e.key === 'Escape') closeConfirmModal();
   });
 
   (async () => {
