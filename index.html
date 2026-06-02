@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Multi Tracker">
+<title>Multi-Location Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #161b26;
+    --surface-2: #1d2330;
+    --border: #262d3d;
+    --border-2: #323a4d;
+    --text: #e7ebf3;
+    --muted: #6a7793;
+    --muted-2: #8a96b3;
+    --accent: #34d399;
+    --accent-dim: rgba(52, 211, 153, 0.12);
+    --accent-glow: rgba(52, 211, 153, 0.45);
+    --danger: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); }
+
+  body {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    padding-top: calc(20px + env(safe-area-inset-top));
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: contain;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* ---- header ---- */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 22px;
+  }
+
+  .title {
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .btn {
+    padding: 9px 14px;
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--muted); background: var(--surface); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { border-color: var(--accent); color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-dim); }
+  .btn-danger { border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover { background: rgba(248, 113, 113, 0.1); }
+
+  /* ---- scenarios ---- */
+  .scenarios {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  @media (min-width: 720px) {
+    .scenarios { gap: 16px; }
+  }
+
+  .scenario {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 14px 16px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .scenario.is-active {
+    border-color: var(--accent);
+    background: linear-gradient(180deg, var(--accent-dim), transparent 50%), var(--surface);
+  }
+
+  .scenario-header {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .scenario-name-wrap { min-width: 0; }
+
+  .scenario-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+
+  .scenario-name {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: 1.2;
+    cursor: text;
+    padding: 3px 6px;
+    margin: -3px -6px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: inherit;
+    width: 100%;
+    min-width: 0;
+    outline: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .scenario-name:hover { background: var(--surface-2); }
+  .scenario-name:focus {
+    background: var(--bg);
+    border-color: var(--border-2);
+  }
+  .scenario.is-active .scenario-name { color: var(--accent); }
+
+  .scenario-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+  .scenario-meta .elapsed-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .scenario-meta .elapsed-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .scenario.is-active .scenario-meta .elapsed-value { color: var(--accent); }
+
+  .scenario-active-name {
+    font-size: 10px;
+    color: var(--muted-2);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    min-height: 1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---- task buttons (stacked vertically within each scenario column) ---- */
+  .task-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .task {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 12px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+    min-height: 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    user-select: none;
+    text-align: left;
+  }
+  .task:hover { border-color: var(--border-2); }
+  .task:active { transform: scale(0.98); }
+  .task.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .task-name {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--text);
+    padding-right: 14px;
+    line-height: 1.25;
+  }
+
+  .task-status {
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  .task.active .task-status { color: var(--accent); }
+
+  .dot {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.15s ease;
+  }
+  .task.active .dot {
+    background: var(--accent);
+    animation: pulse 1.6s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 var(--accent-glow); }
+    70%  { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  }
+
+  /* ---- log ---- */
+  .section-label {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .log-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .log-header {
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .log-header .total { color: var(--accent); font-weight: 600; }
+
+  .log-entries {
+    max-height: 50vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .log-empty {
+    padding: 56px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .log-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1.2fr auto;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    align-items: center;
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-row .loc {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-row .name { color: var(--text); font-weight: 600; }
+  .log-row .time { color: var(--muted-2); font-variant-numeric: tabular-nums; font-size: 11px; }
+  .log-row .duration {
+    color: var(--accent);
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 640px) {
+    .log-row {
+      grid-template-columns: 1fr auto;
+      gap: 4px 12px;
+    }
+    .log-row .loc { grid-column: 1; grid-row: 1; }
+    .log-row .duration { grid-column: 2; grid-row: 1; }
+    .log-row .name { grid-column: 1 / -1; grid-row: 2; }
+    .log-row .time { grid-column: 1 / -1; grid-row: 3; }
+  }
+
+  .log-entries::-webkit-scrollbar { width: 6px; }
+  .log-entries::-webkit-scrollbar-track { background: transparent; }
+  .log-entries::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+  .loading { padding: 56px 20px; text-align: center; color: var(--muted); font-size: 12px; }
+
+  /* ---- modal ---- */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(5, 7, 11, 0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .modal-backdrop.show { display: flex; opacity: 1; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    border-radius: 14px;
+    padding: 24px;
+    max-width: 380px;
+    width: 100%;
+    transform: scale(0.96);
+    transition: transform 0.15s ease;
+  }
+  .modal-backdrop.show .modal { transform: scale(1); }
+  .modal-title {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .modal-body { color: var(--text); font-size: 14px; line-height: 1.6; margin-bottom: 22px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* toast */
+  .toast {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    padding: 11px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 60;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="title">Multi-Location Tracker</div>
+    <div class="header-actions">
+      <button class="btn" id="clearBtn">Clear</button>
+      <button class="btn btn-primary" id="exportBtn">Export CSV</button>
+    </div>
+  </header>
+
+  <div class="scenarios" id="scenarios"></div>
+
+  <div class="section-label">Log</div>
+  <div class="log-section">
+    <div class="log-header">
+      <span id="logCount">0 entries</span>
+      <span class="total" id="logTotal"></span>
+    </div>
+    <div class="log-entries" id="logEntries">
+      <div class="loading">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-title" id="modalTitle">Confirm</div>
+    <div class="modal-body" id="modalBody">Clear all entries for today and stop all running timers? This cannot be undone.</div>
+    <div class="modal-actions">
+      <button class="btn" id="modalCancel">Cancel</button>
+      <button class="btn btn-danger" id="modalConfirm">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const TASKS = ['Drv Task', 'Non Drv Task', 'Idle'];
+  const STATE_KEY = 'multi-tracker:state';
+
+  // Initial scenarios — names are editable; user can rename in the UI.
+  function makeInitialState() {
+    return {
+      scenarios: [
+        { id: 's1', name: 'Location 1', active: null },
+        { id: 's2', name: 'Location 2', active: null },
+        { id: 's3', name: 'Location 3', active: null }
+      ],
+      log: []
+    };
+  }
+
+  let state = makeInitialState();
+  let tickInterval = null;
+
+  // ---------- storage (Claude artifact OR plain localStorage) ----------
+  // Claude's window.storage is rate-limited and can occasionally return
+  // transient "Internal server error" — we retry with backoff and coalesce
+  // rapid writes into a single in-flight save so we don't hammer the API.
+  const storage = (() => {
+    const hasClaudeStorage =
+      typeof window !== 'undefined' &&
+      window.storage &&
+      typeof window.storage.get === 'function' &&
+      typeof window.storage.set === 'function';
+
+    async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    if (hasClaudeStorage) {
+      return {
+        async get(key) {
+          try {
+            const r = await window.storage.get(key);
+            return r && r.value ? r.value : null;
+          } catch (e) { return null; }
+        },
+        async set(key, value) {
+          // Retry with exponential backoff: 200ms, 500ms, 1200ms
+          const delays = [0, 200, 500, 1200];
+          let lastErr;
+          for (let i = 0; i < delays.length; i++) {
+            if (delays[i] > 0) await sleep(delays[i]);
+            try { await window.storage.set(key, value); return; }
+            catch (e) { lastErr = e; }
+          }
+          throw lastErr;
+        }
+      };
+    }
+    return {
+      async get(key) {
+        try { return localStorage.getItem(key); } catch (e) { return null; }
+      },
+      async set(key, value) {
+        try { localStorage.setItem(key, value); }
+        catch (e) { console.error('Storage set failed:', e); throw e; }
+      }
+    };
+  })();
+
+  async function loadState() {
+    try {
+      const raw = await storage.get(STATE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.scenarios) && parsed.scenarios.length === 3) {
+          state.scenarios = parsed.scenarios.map(s => ({
+            id: s.id,
+            name: typeof s.name === 'string' ? s.name : 'Location',
+            active: s.active || null
+          }));
+        }
+        if (Array.isArray(parsed.log)) state.log = parsed.log;
+      }
+    } catch (e) {
+      state = makeInitialState();
+    }
+  }
+
+  // ---- save coalescing ----
+  // Only one save is in flight at a time. If saveState() is called again
+  // while one is running, we just mark "another save is wanted" and it runs
+  // once with the latest state when the current one finishes. This prevents
+  // rapid edits (e.g. tabbing through location names) from stacking writes.
+  let savingPromise = null;
+  let pendingSave = false;
+  let lastSaveErrorAt = 0;
+
+  async function saveState() {
+    if (savingPromise) { pendingSave = true; return savingPromise; }
+    savingPromise = (async () => {
+      try {
+        await storage.set(STATE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error('Save failed after retries:', e);
+        // Only show a toast at most once every 5s so we don't spam
+        const now = Date.now();
+        if (now - lastSaveErrorAt > 5000) {
+          lastSaveErrorAt = now;
+          showToast('Save failed — your work is still on screen');
+        }
+      } finally {
+        savingPromise = null;
+        if (pendingSave) {
+          pendingSave = false;
+          // Run one more time with the latest state
+          saveState();
+        }
+      }
+    })();
+    return savingPromise;
+  }
+
+  // ---------- date helpers ----------
+  function startOfToday() {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();
+  }
+  function endOfToday() {
+    const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime();
+  }
+  function todayLog() {
+    const start = startOfToday(), end = endOfToday();
+    return state.log.filter(e => e.startTime >= start && e.startTime <= end);
+  }
+
+  // ---------- formatting ----------
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatElapsed(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  }
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  function getScenario(id) { return state.scenarios.find(s => s.id === id); }
+
+  // ---------- actions ----------
+  async function toggleTask(scenarioId, taskName) {
+    const scenario = getScenario(scenarioId);
+    if (!scenario) return;
+    const now = Date.now();
+
+    // Close out this scenario's active timer (if any)
+    if (scenario.active) {
+      const finished = {
+        id: scenario.active.id,
+        scenarioId: scenario.id,
+        // Snapshot the scenario name at the time the entry was completed,
+        // so if the user renames it later, history still reflects what it was.
+        scenarioName: scenario.name,
+        taskName: scenario.active.taskName,
+        startTime: scenario.active.startTime,
+        endTime: now,
+        durationMs: Math.max(0, now - scenario.active.startTime)
+      };
+      if (finished.durationMs >= 500) state.log.unshift(finished);
+      const wasSame = scenario.active.taskName === taskName;
+      scenario.active = null;
+      if (wasSame) { await saveState(); render(); return; }
+    }
+
+    // Start new timer in this scenario only — other scenarios untouched.
+    scenario.active = {
+      id: 'e_' + now + '_' + Math.random().toString(36).slice(2, 8),
+      taskName: taskName,
+      startTime: now
+    };
+    await saveState();
+    render();
+  }
+
+  async function renameScenario(scenarioId, newName) {
+    const scenario = getScenario(scenarioId);
+    if (!scenario) return;
+    const trimmed = (newName || '').trim().slice(0, 60);
+    const next = trimmed || scenario.name; // keep old name if user blanks it
+    if (next === scenario.name) return;    // no-op: nothing actually changed
+    scenario.name = next;
+    await saveState();
+    render();
+  }
+
+  function openClearModal() {
+    const hasAnyActive = state.scenarios.some(s => s.active);
+    if (todayLog().length === 0 && !hasAnyActive) {
+      showToast('Nothing to clear');
+      return;
+    }
+    document.getElementById('modalBackdrop').classList.add('show');
+  }
+  function closeClearModal() {
+    document.getElementById('modalBackdrop').classList.remove('show');
+  }
+  async function confirmClear() {
+    closeClearModal();
+    const start = startOfToday(), end = endOfToday();
+    state.log = state.log.filter(e => e.startTime < start || e.startTime > end);
+    state.scenarios.forEach(s => { s.active = null; });
+    await saveState();
+    render();
+    showToast('Cleared today');
+  }
+
+  function exportCSV() {
+    const today = todayLog();
+    if (today.length === 0) { showToast('No entries to export'); return; }
+    const rows = [
+      ['Location', 'Task', 'Start (ISO)', 'End (ISO)', 'Start (local)', 'End (local)', 'Duration', 'Duration (seconds)']
+    ];
+    // Sort chronologically (oldest first) for the export
+    const sorted = [...today].sort((a, b) => a.startTime - b.startTime);
+    sorted.forEach(e => {
+      // Prefer the snapshotted scenarioName from the log entry; fall back to current name.
+      const loc = e.scenarioName || (getScenario(e.scenarioId) || {}).name || '';
+      rows.push([
+        loc,
+        e.taskName,
+        new Date(e.startTime).toISOString(),
+        new Date(e.endTime).toISOString(),
+        new Date(e.startTime).toLocaleString(),
+        new Date(e.endTime).toLocaleString(),
+        formatElapsed(e.durationMs),
+        Math.floor(e.durationMs / 1000)
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => {
+      const s = String(c ?? '');
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url; a.download = `multi-tracker-${stamp}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ---------- render ----------
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+  function render() {
+    // scenarios
+    const container = document.getElementById('scenarios');
+    container.innerHTML = '';
+    state.scenarios.forEach(scenario => {
+      const isActive = !!scenario.active;
+      const elapsedText = isActive
+        ? formatElapsed(Date.now() - scenario.active.startTime)
+        : '0:00';
+      const activeNameText = isActive ? `Running: ${scenario.active.taskName}` : '';
+
+      const panel = document.createElement('div');
+      panel.className = 'scenario' + (isActive ? ' is-active' : '');
+      panel.dataset.scenarioId = scenario.id;
+      panel.innerHTML = `
+        <div class="scenario-header">
+          <div class="scenario-name-wrap">
+            <div class="scenario-label">Location</div>
+            <input class="scenario-name" type="text" maxlength="60"
+              value="${escapeHtml(scenario.name)}"
+              data-scenario-id="${scenario.id}"
+              aria-label="Location name (tap to rename)">
+            <div class="scenario-active-name" data-elapsed-name>${escapeHtml(activeNameText)}</div>
+          </div>
+          <div class="scenario-meta">
+            <div class="elapsed-label">Elapsed</div>
+            <div class="elapsed-value" data-elapsed-value>${elapsedText}</div>
+          </div>
+        </div>
+        <div class="task-row">
+          ${TASKS.map(taskName => {
+            const isThisActive = isActive && scenario.active.taskName === taskName;
+            return `
+              <button type="button" class="task${isThisActive ? ' active' : ''}"
+                data-scenario-id="${scenario.id}"
+                data-task="${escapeHtml(taskName)}">
+                <div class="task-name">${escapeHtml(taskName)}</div>
+                <div class="task-status">${isThisActive ? 'Tap to stop' : 'Tap to start'}</div>
+                <span class="dot"></span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+      container.appendChild(panel);
+    });
+
+    // Wire up task buttons
+    container.querySelectorAll('.task').forEach(btn => {
+      btn.addEventListener('click', () => {
+        toggleTask(btn.dataset.scenarioId, btn.dataset.task);
+      });
+    });
+
+    // Wire up name inputs
+    container.querySelectorAll('.scenario-name').forEach(input => {
+      // Save on blur or Enter
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        else if (e.key === 'Escape') {
+          const s = getScenario(input.dataset.scenarioId);
+          if (s) input.value = s.name;
+          input.blur();
+        }
+      });
+      input.addEventListener('blur', () => {
+        renameScenario(input.dataset.scenarioId, input.value);
+      });
+      input.addEventListener('focus', () => input.select());
+    });
+
+    // ---- log ----
+    const today = todayLog();
+    document.getElementById('logCount').textContent =
+      `${today.length} ${today.length === 1 ? 'entry' : 'entries'}`;
+    const totalMs = today.reduce((sum, e) => sum + e.durationMs, 0);
+    document.getElementById('logTotal').textContent =
+      today.length > 0 ? `Total ${formatElapsed(totalMs)}` : '';
+
+    const entries = document.getElementById('logEntries');
+    if (today.length === 0) {
+      entries.innerHTML = '<div class="log-empty">No entries yet.</div>';
+    } else {
+      entries.innerHTML = today.map(e => {
+        // Show the CURRENT scenario name if the entry's scenario still exists & has been renamed.
+        // (Snapshot is preserved in storage for CSV; live view tracks current naming.)
+        const liveName = (getScenario(e.scenarioId) || {}).name;
+        const locName = liveName || e.scenarioName || '';
+        return `
+          <div class="log-row">
+            <div class="loc">${escapeHtml(locName)}</div>
+            <div class="name">${escapeHtml(e.taskName)}</div>
+            <div class="time">${formatTime(e.startTime)} → ${formatTime(e.endTime)}</div>
+            <div class="duration">${formatElapsed(e.durationMs)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ---- tick ----
+    const anyActive = state.scenarios.some(s => s.active);
+    if (anyActive && !tickInterval) {
+      tickInterval = setInterval(updateLive, 1000);
+    } else if (!anyActive && tickInterval) {
+      clearInterval(tickInterval); tickInterval = null;
+    }
+  }
+
+  function updateLive() {
+    document.querySelectorAll('.scenario').forEach(panel => {
+      const sid = panel.dataset.scenarioId;
+      const scenario = getScenario(sid);
+      if (!scenario || !scenario.active) return;
+      const ev = panel.querySelector('[data-elapsed-value]');
+      if (ev) ev.textContent = formatElapsed(Date.now() - scenario.active.startTime);
+    });
+  }
+
+  // ---------- toast ----------
+  let toastTimer = null;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // ---------- init ----------
+  document.getElementById('clearBtn').addEventListener('click', openClearModal);
+  document.getElementById('exportBtn').addEventListener('click', exportCSV);
+  document.getElementById('modalCancel').addEventListener('click', closeClearModal);
+  document.getElementById('modalConfirm').addEventListener('click', confirmClear);
+  document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'modalBackdrop') closeClearModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeClearModal();
+  });
+
+  (async () => {
+    await loadState();
+    render();
+  })();
+</script>
+</body>
+</html>
